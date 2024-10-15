@@ -3,7 +3,7 @@
 # If you want to customize installation, please make a copy.
 
 DISTRO_NAME="Ubuntu (24.04)"
-DISTRO_COMMENT="LTS release (development)."
+DISTRO_COMMENT=""Noble Numbat (24.04) LTS.
 
 TARBALL_STRIP_OPT=0
 
