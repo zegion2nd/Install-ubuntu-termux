@@ -20,5 +20,5 @@ apt install -y wget curl proot-distro
 wget -q https://raw.githubusercontent.com/NobDev69/Install-ubuntu-termux/refs/heads/main/${chu}.sh -O ${pika}/${chu}.sh
 
 # Install and launch the specified distribution
-proot-distro install ${chu}
-proot-distro login ${chu}
+pd i ${chu}
+pd sh ${chu}
