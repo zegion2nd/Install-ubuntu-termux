@@ -11,7 +11,9 @@ if [ -z "$chu" ]; then
 fi
 
 # Update and install required packages
-apt update && apt upgrade -y
+apt update
+yes | apt upgrade
+apt update
 apt install -y wget curl proot-distro
 
 # Download the distribution-specific script
