@@ -1,0 +1,154 @@
+#!/bin/bash
+
+# Update and install necessary packages
+apt update
+apt install sudo dialog apt-utils -y
+
+# Variables
+TMPDIR=/var/tmp
+
+# Functions
+msg() {
+  ALL_OFF="\e[1;0m"
+  BOLD="\e[1;1m"
+  GREEN="${BOLD}\e[1;32m"
+  local mesg=$1; shift
+  printf "${GREEN}==>${ALL_OFF}${BOLD} ${mesg}${ALL_OFF}\n" "$@" >&2
+}
+
+show_spinner() {
+  local -r pid="${1}"
+  local -r delay='0.75'
+  local spinstr='\|/-'
+  local temp
+  printf "${GREEN} This might take a while.. "
+  while ! grep -q "done" $TMPDIR/status ; do
+    temp="${spinstr#?}"
+    printf " [%c]  " "${spinstr}"
+    spinstr=${temp}${spinstr%"${temp}"}
+    sleep "${delay}"
+    printf "\b\b\b\b\b\b"
+  done
+  printf "Done!  \b\b\b\b"
+  echo ""
+}
+
+create_oem_install() {
+  echo "$USER" > $TMPDIR/user
+  echo "$PASSWORD" >> $TMPDIR/password
+  echo "$PASSWORD" >> $TMPDIR/password
+  echo "$ROOTPASSWORD" >> $TMPDIR/rootpassword
+  echo "$ROOTPASSWORD" >> $TMPDIR/rootpassword
+
+  msg "Setting root password..."
+  echo "root:$ROOTPASSWORD" | chpasswd
+
+  msg "Adding user $USER..."
+  echo "" > $TMPDIR/status
+  useradd -m -G sudo -s /bin/bash -U $(cat $TMPDIR/user) && echo "done" > $TMPDIR/status &
+  show_spinner
+
+  msg "Setting full name to $FULLNAME..."
+  chfn -f "$FULLNAME" $(cat $TMPDIR/user)
+
+  msg "Setting password for $USER..."
+  echo "$(cat $TMPDIR/user):$PASSWORD" | chpasswd
+
+  msg "Granting sudo privileges to $USER..."
+  usermod -aG sudo $(cat $TMPDIR/user)
+
+  msg "Cleaning install for unwanted files..."
+  rm -rf /var/log/*
+
+  # Remove temp files on host
+  rm -rf $TMPDIR/user $TMPDIR/password $TMPDIR/rootpassword
+}
+
+# Using Dialog to ask for user input for variables
+USER=$(dialog --clear --title "Finish Ubuntu Install" \
+        --inputbox "Enter username:
+(Usernames can only be lower case)" 8 50 \
+  3>&1 1>&2 2>&3 3>&-)
+
+if [ -z "$USER" ]; then
+  clear
+  msg "Configuration aborted. Restarting install script..."
+  sleep 5 && exec bash $0
+fi
+
+FULLNAME=$(dialog --clear --title "Finish Ubuntu Install" \
+  --inputbox "Enter Full Name for $USER:" 8 50 \
+  3>&1 1>&2 2>&3 3>&-)
+
+if [ -z "$FULLNAME" ]; then
+  clear
+  msg "Configuration aborted. Restarting install script..."
+  sleep 5 && exec bash $0
+fi
+
+PASSWORD=$(dialog --clear --title "Finish Ubuntu Install" \
+  --insecure --passwordbox "Enter Password for $USER (at least 6 characters):" 8 50 \
+  3>&1 1>&2 2>&3 3>&-)
+
+if [ -z "$PASSWORD" ] || [ ${#PASSWORD} -lt 6 ]; then
+  clear
+  msg "Password must be at least 6 characters long. Restarting install script..."
+  sleep 5 && exec bash $0
+fi
+
+CONFIRMPASSWORD=$(dialog --clear --title "Ubuntu Installer" \
+  --insecure --passwordbox "Confirm Password for $USER:" 8 50 \
+  3>&1 1>&2 2>&3 3>&-)
+
+if [ "$PASSWORD" != "$CONFIRMPASSWORD" ]; then
+  clear
+  msg "User passwords do not match! Restarting install script..."
+  sleep 5 && exec bash $0
+fi
+
+ROOTPASSWORD=$(dialog --clear --title "Finish Ubuntu Install" \
+  --insecure --passwordbox "Enter Root Password (at least 6 characters):" 8 50 \
+  3>&1 1>&2 2>&3 3>&-)
+
+if [ -z "$ROOTPASSWORD" ] || [ ${#ROOTPASSWORD} -lt 6 ]; then
+  clear
+  msg "Password must be at least 6 characters long. Restarting install script..."
+  sleep 5 && exec bash $0
+fi
+
+CONFIRMROOTPASSWORD=$(dialog --clear --title "Ubuntu Installer" \
+  --insecure --passwordbox "Confirm Root Password:" 8 50 \
+  3>&1 1>&2 2>&3 3>&-)
+
+if [ "$ROOTPASSWORD" != "$CONFIRMROOTPASSWORD" ]; then
+  clear
+  msg "Root passwords do not match! Restarting install script..."
+  sleep 5 && exec bash $0
+fi
+
+dialog --clear --title "Finish Ubuntu Install" \
+  --yesno "Is the below information correct:
+  Username = $USER
+  Full Name for $USER = $FULLNAME
+  Password for $USER = $PASSWORD
+  Password for root = $ROOTPASSWORD" 20 50 \
+  3>&1 1>&2 2>&3 3>&-
+
+response=$?
+case $response in
+  0) clear; msg "Proceeding....";;
+  1|255) clear; msg "Configuration aborted. Restarting install script..."; sleep 5 && exec bash $0;;
+esac
+
+create_oem_install
+
+msg "Configuration complete. Cleaning up..."
+
+# Set environment variables and finalize
+[ ! -f /root/.bashrc ] && touch /root/.bashrc
+[ ! -f /home/$USER/.profile ] && touch /home/$USER/.profile
+
+echo "export DISPLAY=:1" >> /root/.bashrc
+echo "export DISPLAY=:1" >> /home/$USER/.profile
+touch /home/$USER/.hushlogin
+su -l $USER
