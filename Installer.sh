@@ -1,6 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
 pika="${PREFIX}/etc/proot-distro"
+rai="${PREFIX}/var/lib/proot-distro/installed-rootfs"
 chu=$1
 
 # Ensure a distro name is passed as an argument
@@ -21,4 +22,5 @@ wget -q https://raw.githubusercontent.com/NobDev69/Install-ubuntu-termux/refs/he
 
 # Install and launch the specified distribution
 pd i ${chu}
+wget -q https://raw.githubusercontent.com/NobDev69/Install-ubuntu-termux/refs/heads/main/quick-setup -O ${rai}/${chu}/root/
 pd sh ${chu}
